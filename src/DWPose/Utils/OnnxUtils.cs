@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
 using System.Threading.Tasks.Dataflow;
+using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using OpenCvSharp;
 using OpenCvSharp.Dnn;
@@ -149,5 +150,56 @@ namespace DWPose
         {
             Console.WriteLine(GetPrintString(dst));
         }
+
+        static string _onnx_folder = "";
+        static OnnxRunModel _runModel = OnnxRunModel.CPU;
+        static int _deviceId = 0;
+
+        /// <summary>
+        /// config onnx base info.
+        /// </summary>
+        /// <param name="modelsBasefolder">onnx model save folder</param>
+        /// <param name="runModel"></param>
+        /// <param name="deviceId">If you are using CUDA or DirectML and have multiple devices, you need to set deviceId (0,1,2...)</param>
+        public static void ConfigOnnx(string modelsBasefolder = "", OnnxRunModel runModel = OnnxRunModel.CPU, int deviceId = 0)
+        {
+            _onnx_folder = modelsBasefolder;
+            _runModel = runModel;
+            _deviceId = deviceId;
+        }
+
+        public static InferenceSession GetSession(string det_onnx_name)
+        {
+            var name = Path.Combine(_onnx_folder, det_onnx_name);
+
+            if (!File.Exists(name))
+            {
+                throw new Exception($"not find onnx file:{name}");
+            }
+
+            var config = new SessionOptions();
+
+            switch(_runModel)
+            {
+                case OnnxRunModel.Cuda:
+                    config.AppendExecutionProvider_CUDA(0);
+                    break;
+                case OnnxRunModel.DirectML:
+                    config.AppendExecutionProvider_DML();
+                    break;
+            }
+            config.EnableMemoryPattern = false;
+
+            return new InferenceSession(name, config);
+        }
+    }
+
+    public enum OnnxRunModel
+    {
+        CPU,
+
+        Cuda,
+
+        DirectML,
     }
 }

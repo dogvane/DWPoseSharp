@@ -13,28 +13,26 @@ namespace DWPose
     /// <summary>
     /// yolo 的人物检测工具
     /// </summary>
+    /// <remarks>
+    /// https://github.com/mit-han-lab/proxylessnas/blob/bf58b5c330677afa4bfaf933488b68779f9ec601/proxyless_gaze/training/face_detection/demo/ONNXRuntime/README.md?plain=1#L13
+    /// </remarks>
     public class YoloPersornDet
     {
-        internal static string onnx_folder = "";
-
         public static string det_onnx_name = "yolox_l.onnx";
+
+        public YoloPersornDet()
+        {
+            GetSession();
+        }
 
         static InferenceSession s_session;
 
         private static InferenceSession GetSession()
         {
-            var name = Path.Combine(onnx_folder, det_onnx_name);
-
-            if (!File.Exists(name))
-            {
-                throw new Exception($"onnx 模型文件不存在: file:{name}");
-            }
-
-
             if (s_session != null)
                 return s_session;
 
-            s_session = new InferenceSession(name);
+            s_session = OnnxUtils.GetSession(det_onnx_name);
 
             return s_session;
         }
@@ -55,11 +53,16 @@ namespace DWPose
             var yolo_width = 640;
             var yolo_height = 640;
 
+            //var yolo_width = 416;
+            //var yolo_height = 416;
+
             var inputName = "images";
             var inputShape = new int[] { 1, 3, yolo_width, yolo_height };
             (var inputTensor, var scRate) = ConvertToTorchTensrot(orgImg, new[] { yolo_width, yolo_height });
+            
+            var onnxInputs = new NamedOnnxValue[] { NamedOnnxValue.CreateFromTensor(inputName, inputTensor) };
+            var ret = yolox.Run(onnxInputs);
 
-            var ret = yolox.Run(new NamedOnnxValue[] { NamedOnnxValue.CreateFromTensor(inputName, inputTensor) });
             DenseTensor<float> yoloret = (DenseTensor<float>)ret.First().Value;
             var shape = yoloret.Dimensions.ToArray();
             var arr = yoloret.ToArray<float>();

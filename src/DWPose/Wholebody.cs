@@ -11,7 +11,10 @@ namespace DWPose
 {
     public class Wholebody
     {
-        internal static string onnx_folder = "";
+        public Wholebody()
+        {
+            GetSession();
+        }
 
         public static string pose_onnx_name = "dw-ll_ucoco_384.onnx";
 
@@ -21,17 +24,10 @@ namespace DWPose
 
         private static InferenceSession GetSession()
         {
-            var name = Path.Combine(onnx_folder, pose_onnx_name);
-
-            if (!File.Exists(name))
-            {
-                throw new Exception($"onnx 模型文件不存在: file:{name}");
-            }
-
             if (s_session != null)
                 return s_session;
 
-            s_session = new InferenceSession(name);
+            s_session = OnnxUtils.GetSession(pose_onnx_name);
 
             return s_session;
         }
@@ -48,8 +44,10 @@ namespace DWPose
 
         public DWPoseData[] Det(Mat oriImg)
         {
-
             List<YoloPrediction> detections = yoloPersornDet.FindPerson(oriImg);
+
+            if(detections.Count == 0)
+                return new DWPoseData[0];
 
             var dwpose = GetSession();
             List<DWPoseData> retPoseData = new List<DWPoseData>();
@@ -59,7 +57,10 @@ namespace DWPose
             var simcc_split_ratio = 2.0f;
 
             var inputTensor = out_img.ImgToTensort(true);
-            var ret = dwpose.Run((new NamedOnnxValue[] { NamedOnnxValue.CreateFromTensor("input", inputTensor) }));
+            var onnxInputs = new NamedOnnxValue[] { NamedOnnxValue.CreateFromTensor("input", inputTensor) };
+
+            var ret = dwpose.Run(onnxInputs);
+
             var simcc_x = ret.First(o => o.Name == "simcc_x").AsTensor<float>();
             var simcc_y = ret.First(o => o.Name == "simcc_y").AsTensor<float>();
 
@@ -489,11 +490,6 @@ namespace DWPose
             return (keypoints, scores);
         }
 
-        public static void SetOnnxFolder(string folder)
-        {
-            onnx_folder = folder;
-            YoloPersornDet.onnx_folder = folder;
-        }
 
         #endregion
 
